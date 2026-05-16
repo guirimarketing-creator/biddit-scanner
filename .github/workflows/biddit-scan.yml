@@ -1,0 +1,50 @@
+name: Biddit Weekly Scan
+
+on:
+  schedule:
+    # Every Sunday at 07:00 UTC = 08:00 Belgian winter / 09:00 Belgian summer
+    - cron: '0 7 * * 0'
+  workflow_dispatch:   # allows manual "Run workflow" button on GitHub
+
+jobs:
+  scan-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180   # 3 hours max (full scan ~75 min)
+
+    permissions:
+      contents: write      # needed to push to gh-pages branch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright + Chromium system deps
+        run: playwright install chromium --with-deps
+
+      - name: Run full scan
+        run: python main.py --no-open
+
+      - name: Prepare report for GitHub Pages
+        run: |
+          mkdir -p docs
+          REPORT=$(ls -t reports/biddit_report_*.html | head -1)
+          cp "$REPORT" docs/index.html
+          echo "Published report: $REPORT"
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          commit_message: "Weekly report ${{ github.run_id }}"
+          force_orphan: false

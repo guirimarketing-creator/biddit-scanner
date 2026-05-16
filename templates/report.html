@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biddit Vastgoedanalyse – {{ run_date }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+  header { background: #1a3a5c; color: #fff; padding: 24px 32px; }
+  header h1 { font-size: 1.6rem; font-weight: 700; }
+  header p { margin-top: 6px; opacity: 0.8; font-size: 0.95rem; }
+  .stats { display: flex; gap: 16px; padding: 20px 32px; flex-wrap: wrap; }
+  .stat { background: #fff; border-radius: 8px; padding: 16px 24px; flex: 1; min-width: 160px;
+          box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center; }
+  .stat .value { font-size: 2rem; font-weight: 700; color: #1a3a5c; }
+  .stat .label { font-size: 0.82rem; color: #666; margin-top: 4px; }
+  section { margin: 0 32px 32px; }
+  section h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 12px; color: #1a3a5c; border-bottom: 2px solid #1a3a5c; padding-bottom: 6px; }
+  .table-wrap { overflow-x: auto; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.875rem; }
+  thead { background: #1a3a5c; color: #fff; }
+  thead th { padding: 10px 14px; text-align: left; cursor: pointer; white-space: nowrap; user-select: none; }
+  thead th:hover { background: #254f7a; }
+  tbody tr { border-bottom: 1px solid #eee; }
+  tbody tr:hover { background: #f0f6ff; }
+  td { padding: 10px 14px; vertical-align: middle; }
+  td.yield { font-weight: 700; }
+  td.yield.good { color: #16a34a; }
+  td.yield.ok   { color: #ca8a04; }
+  td.yield.low  { color: #dc2626; }
+  .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+  .badge-A  { background:#bbf7d0; color:#166534; }
+  .badge-B  { background:#d1fae5; color:#065f46; }
+  .badge-C  { background:#fef9c3; color:#713f12; }
+  .badge-D  { background:#fde68a; color:#92400e; }
+  .badge-E  { background:#fcd34d; color:#78350f; }
+  .badge-F  { background:#fca5a5; color:#7f1d1d; }
+  .badge-G  { background:#ef4444; color:#fff; }
+  .badge-goed    { background:#bbf7d0; color:#166534; }
+  .badge-frissen { background:#fef9c3; color:#713f12; }
+  .badge-renov   { background:#fca5a5; color:#7f1d1d; }
+  .badge-sloop   { background:#ef4444; color:#fff; }
+  .est-size { font-size:0.72rem; color:#888; font-style:italic; }
+  .thumb { width: 72px; height: 52px; object-fit: cover; border-radius: 4px; display: block; }
+  .thumb-placeholder { width: 72px; height: 52px; background: #e5e7eb; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+  a { color: #1a3a5c; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 1px 7px; font-size: 0.72rem; margin-right: 4px; }
+  .methodology { background: #fff; border-radius: 8px; padding: 16px 20px; margin: 0 32px 32px; box-shadow: 0 1px 4px rgba(0,0,0,.08); font-size: 0.85rem; color: #555; line-height: 1.6; }
+  .methodology strong { color: #222; }
+  .highlight-row { background: #f0fdf4 !important; }
+  @media(max-width:700px) { section, .stats, .methodology { margin-left: 12px; margin-right: 12px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Biddit Vastgoedanalyse – Vlaanderen (excl. West-Vlaanderen)</h1>
+  <p>Gegenereerd op {{ run_date }} &nbsp;|&nbsp; Minimale bruto rendement: {{ min_yield }}%</p>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="value">{{ stats.total_found }}</div><div class="label">Totaal gevonden op Biddit</div></div>
+  <div class="stat"><div class="value">{{ stats.total_in_region }}</div><div class="label">In doelregio (Vlaanderen excl. W-Vl)</div></div>
+  <div class="stat"><div class="value">{{ stats.total_with_yield }}</div><div class="label">Met berekend rendement</div></div>
+  <div class="stat"><div class="value" style="color:#16a34a">{{ stats.total_interesting }}</div><div class="label">Interessant (≥ {{ min_yield }}% rendement)</div></div>
+</div>
+
+{% if top_picks %}
+<section>
+  <h2>⭐ Top picks – rendement ≥ {{ min_yield }}%</h2>
+  <div class="table-wrap">
+    <table id="top-table">
+      <thead>
+        <tr>
+          <th>Foto</th>
+          <th onclick="sortTable('top-table',1)">Titel ↕</th>
+          <th onclick="sortTable('top-table',2)">Stad ↕</th>
+          <th onclick="sortTable('top-table',3)">Type ↕</th>
+          <th onclick="sortTable('top-table',4)">Opp. ↕</th>
+          <th onclick="sortTable('top-table',5)">Veilingdatum ↕</th>
+          <th onclick="sortTable('top-table',6)">Vraagprijs ↕</th>
+          <th onclick="sortTable('top-table',7)">Est. huur/mnd ↕</th>
+          <th onclick="sortTable('top-table',8)">Bruto rendement ↕</th>
+          <th onclick="sortTable('top-table',9)">Staat ↕</th>
+          <th onclick="sortTable('top-table',10)">Est. renov. ↕</th>
+          <th onclick="sortTable('top-table',11)">EPC ↕</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in top_picks %}
+        <tr class="{% if p.gross_yield >= 7 %}highlight-row{% endif %}">
+          <td>
+            {% if p.image_url %}
+              <img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy">
+            {% else %}
+              <div class="thumb-placeholder">🏠</div>
+            {% endif %}
+          </td>
+          <td>{{ p.title or '–' }}</td>
+          <td>{{ p.city or '–' }}<br><small style="color:#888">{{ p.province }}</small></td>
+          <td><span class="tag">{{ p.property_type }}</span></td>
+          <td>
+            {{ '%.0f m²'|format(p.size_m2) if p.size_m2 else '–' }}
+            {% if p.size_estimated %}<br><span class="est-size">geschat</span>{% endif %}
+          </td>
+          <td>{{ p.auction_date or '–' }}</td>
+          <td>{{ '€ {:,.0f}'.format(p.starting_price).replace(',','.') if p.starting_price else '–' }}</td>
+          <td>{{ '€ {:,.0f}'.format(p.estimated_monthly_rent).replace(',','.') if p.estimated_monthly_rent else '–' }}</td>
+          <td class="yield {% if p.gross_yield >= 6 %}good{% elif p.gross_yield >= 5 %}ok{% else %}low{% endif %}">
+            {{ '%.1f%%'|format(p.gross_yield) if p.gross_yield else '–' }}
+          </td>
+          <td>
+            {% if p.renovation_state %}
+              {% set rs = p.renovation_state|lower %}
+              {% if 'goed' in rs or 'nieuw' in rs %}
+                <span class="badge badge-goed">{{ p.renovation_state }}</span>
+              {% elif 'frissen' in rs %}
+                <span class="badge badge-frissen">{{ p.renovation_state }}</span>
+              {% elif 'renov' in rs %}
+                <span class="badge badge-renov">{{ p.renovation_state }}</span>
+              {% elif 'sloop' in rs or 'breken' in rs %}
+                <span class="badge badge-sloop">{{ p.renovation_state }}</span>
+              {% else %}
+                {{ p.renovation_state }}
+              {% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td>
+            {% if p.renovation_cost_estimate is not none %}
+              {% if p.renovation_cost_estimate == 0 %}
+                <span style="color:#16a34a">€ 0</span>
+              {% else %}
+                ≈ € {{ '{:,.0f}'.format(p.renovation_cost_estimate).replace(',','.') }}
+              {% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>
+            {% if p.epc_score %}
+              <span class="badge badge-{{ p.epc_score[0] }}">{{ p.epc_score }}</span>
+            {% else %}–{% endif %}
+          </td>
+          <td><a href="{{ p.url }}" target="_blank">↗ Bekijk</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section>
+  <p style="padding:24px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+    Geen panden gevonden met een rendement ≥ {{ min_yield }}% in deze scrape-ronde.
+  </p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Alle panden in Vlaanderen (excl. West-Vlaanderen)</h2>
+  <div class="table-wrap">
+    <table id="all-table">
+      <thead>
+        <tr>
+          <th>Foto</th>
+          <th onclick="sortTable('all-table',1)">Titel ↕</th>
+          <th onclick="sortTable('all-table',2)">Stad ↕</th>
+          <th onclick="sortTable('all-table',3)">Provincie ↕</th>
+          <th onclick="sortTable('all-table',4)">Type ↕</th>
+          <th onclick="sortTable('all-table',5)">Opp. ↕</th>
+          <th onclick="sortTable('all-table',6)">Veilingdatum ↕</th>
+          <th onclick="sortTable('all-table',7)">Vraagprijs ↕</th>
+          <th onclick="sortTable('all-table',8)">Est. huur/mnd ↕</th>
+          <th onclick="sortTable('all-table',9)">Bruto rendement ↕</th>
+          <th onclick="sortTable('all-table',10)">Staat ↕</th>
+          <th onclick="sortTable('all-table',11)">Est. renov. ↕</th>
+          <th onclick="sortTable('all-table',12)">EPC ↕</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in all_properties %}
+        <tr>
+          <td>
+            {% if p.image_url %}
+              <img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy">
+            {% else %}
+              <div class="thumb-placeholder">🏠</div>
+            {% endif %}
+          </td>
+          <td>{{ p.title or '–' }}</td>
+          <td>{{ p.city or '–' }}</td>
+          <td>{{ p.province or '–' }}</td>
+          <td><span class="tag">{{ p.property_type }}</span></td>
+          <td>
+            {{ '%.0f m²'|format(p.size_m2) if p.size_m2 else '–' }}
+            {% if p.size_estimated %}<br><span class="est-size">geschat</span>{% endif %}
+          </td>
+          <td>{{ p.auction_date or '–' }}</td>
+          <td>{{ '€ {:,.0f}'.format(p.starting_price).replace(',','.') if p.starting_price else '–' }}</td>
+          <td>{{ '€ {:,.0f}'.format(p.estimated_monthly_rent).replace(',','.') if p.estimated_monthly_rent else '–' }}</td>
+          <td class="yield {% if p.gross_yield and p.gross_yield >= 6 %}good{% elif p.gross_yield and p.gross_yield >= 5 %}ok{% elif p.gross_yield %}low{% endif %}">
+            {{ '%.1f%%'|format(p.gross_yield) if p.gross_yield else '–' }}
+          </td>
+          <td>
+            {% if p.renovation_state %}
+              {% set rs = p.renovation_state|lower %}
+              {% if 'goed' in rs or 'nieuw' in rs %}
+                <span class="badge badge-goed">{{ p.renovation_state }}</span>
+              {% elif 'frissen' in rs %}
+                <span class="badge badge-frissen">{{ p.renovation_state }}</span>
+              {% elif 'renov' in rs %}
+                <span class="badge badge-renov">{{ p.renovation_state }}</span>
+              {% elif 'sloop' in rs or 'breken' in rs %}
+                <span class="badge badge-sloop">{{ p.renovation_state }}</span>
+              {% else %}
+                {{ p.renovation_state }}
+              {% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td>
+            {% if p.renovation_cost_estimate is not none %}
+              {% if p.renovation_cost_estimate == 0 %}
+                <span style="color:#16a34a">€ 0</span>
+              {% else %}
+                ≈ € {{ '{:,.0f}'.format(p.renovation_cost_estimate).replace(',','.') }}
+              {% endif %}
+            {% else %}?{% endif %}
+          </td>
+          <td>
+            {% if p.epc_score %}
+              <span class="badge badge-{{ p.epc_score[0] }}">{{ p.epc_score }}</span>
+            {% else %}–{% endif %}
+          </td>
+          <td><a href="{{ p.url }}" target="_blank">↗ Bekijk</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="methodology">
+  <strong>Methodologie</strong><br>
+  Bruto rendement = (geschatte jaarlijkse huurinkomsten / vraagprijs) × 100.<br>
+  Geschatte maandhuur = bewoonbare oppervlakte (m²) × gemiddelde huurprijs per m² voor de stad/provincie
+  (bron: CIB Huurbarometer &amp; Statbel, 2023–2024). Oppervlakte gemarkeerd als <em>geschat</em> is afgeleid
+  uit het aantal slaapkamers wanneer de bewoonbare oppervlakte niet gepubliceerd werd.<br>
+  Geraamde renovatiekosten: op te frissen ≈ €20.000 · te renoveren ≈ €70.000 · volledig te renoveren ≈ €100.000.
+  EPC-energierenovatie (Vlaamse verplichting 2028/2035): EPC D ≈ €10.000 · EPC E ≈ €35.000 · EPC F ≈ €65.000 · EPC G ≈ €90.000.
+  Bij volledige renovatie zijn energiekosten inbegrepen (geen dubbeltelling).<br>
+  <strong>Let op:</strong> dit zijn ruwe schattingen. Houd rekening met registratierechten (10–12% in Vlaanderen),
+  notariskosten (~2%), renovatiekosten, leegstand en verhuurbeheerskosten. Verifieer altijd de werkelijke
+  huurmarkt voor de specifieke locatie voor een investeringsbeslissing.
+</div>
+
+<script>
+function sortTable(tableId, col) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const asc = table.dataset.sortCol == col && table.dataset.sortDir == 'asc';
+  rows.sort((a, b) => {
+    const ta = a.cells[col]?.innerText.trim() || '';
+    const tb = b.cells[col]?.innerText.trim() || '';
+    const na = parseFloat(ta.replace(/[^0-9.,]/g,'').replace(',','.'));
+    const nb = parseFloat(tb.replace(/[^0-9.,]/g,'').replace(',','.'));
+    if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+    return asc ? ta.localeCompare(tb) : tb.localeCompare(ta);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+  table.dataset.sortCol = col;
+  table.dataset.sortDir = asc ? 'desc' : 'asc';
+}
+</script>
+
+</body>
+</html>
